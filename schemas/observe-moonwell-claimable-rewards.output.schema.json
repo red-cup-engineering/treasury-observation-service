@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "treasury-observation-service/observe-moonwell-claimable-rewards-output",
+  "title": "observeMoonwellClaimableRewardsOutput",
+  "description": "observeMoonwellClaimableRewards()'s result: MoonwellOutstandingRewards, unmodified from src/rewards.mjs.",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["chain", "distributor", "address", "checked", "reason", "attempts"],
+      "properties": {
+        "chain": { "type": "string" }, "distributor": { "type": "string" }, "address": { "type": "string" },
+        "checked": { "const": false }, "reason": { "type": "string" },
+        "attempts": { "type": "array", "items": { "type": "object" } }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": ["chain", "distributor", "address", "checked", "rewards"],
+      "properties": {
+        "chain": { "type": "string" }, "distributor": { "type": "string" }, "address": { "type": "string" },
+        "checked": { "const": true },
+        "rewards": { "type": "array", "items": { "type": "object", "required": ["market", "emissionToken", "totalAmountRaw"] } },
+        "provenance": { "type": "object" }
+      },
+      "additionalProperties": false
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "treasury-observation-service/observe-morpho-vault-position-input",
+  "title": "observeMorphoVaultPositionReportInput",
+  "description": "The request observeMorphoVaultPositionReport() takes. principalAssetsRaw is the caller's own recorded principal in the vault asset's smallest unit; it is never invented, and accrued yield is refused as data when it is absent.",
+  "type": "object",
+  "required": ["owner", "vault"],
+  "properties": {
+    "owner": { "type": "string", "pattern": "^0x[0-9a-fA-F]{40}$" },
+    "vault": { "type": "string", "pattern": "^0x[0-9a-fA-F]{40}$" },
+    "principalAssetsRaw": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
+    "chainId": { "type": "string" }
+  },
+  "additionalProperties": false
+}

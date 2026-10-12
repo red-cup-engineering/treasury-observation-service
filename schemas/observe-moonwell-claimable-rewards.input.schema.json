@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "treasury-observation-service/observe-moonwell-claimable-rewards-input",
+  "title": "observeMoonwellClaimableRewardsInput",
+  "description": "The request observeMoonwellClaimableRewards() takes.",
+  "type": "object",
+  "required": ["wallet", "distributor"],
+  "properties": {
+    "wallet": { "type": "string", "pattern": "^0x[0-9a-fA-F]{40}$" },
+    "distributor": { "type": "string", "pattern": "^0x[0-9a-fA-F]{40}$" },
+    "chainId": { "type": "string" }
+  },
+  "additionalProperties": false
+}

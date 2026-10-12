@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "treasury-observation-service/observe-morpho-vault-position-output",
+  "title": "observeMorphoVaultPositionReportOutput",
+  "description": "observeMorphoVaultPositionReport()'s result. checked:false means the position was never learned (endpoints unreachable or disagreeing), never that it is empty.",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["chain", "vault", "owner", "checked", "reason", "attempts"],
+      "properties": {
+        "chain": { "type": "string" }, "vault": { "type": "string" }, "owner": { "type": "string" },
+        "checked": { "const": false }, "reason": { "type": "string" },
+        "attempts": { "type": "array", "items": { "type": "object" } }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": ["chain", "vault", "owner", "checked", "empty", "shares", "sources", "apy"],
+      "properties": {
+        "chain": { "type": "string" }, "vault": { "type": "string" }, "owner": { "type": "string" },
+        "checked": { "const": true }, "empty": { "const": true },
+        "shares": { "type": "object", "required": ["raw", "decimals", "amount"] },
+        "sources": { "type": "array", "items": { "type": "string" }, "minItems": 2 },
+        "apy": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": ["chain", "vault", "owner", "checked", "empty", "shares", "asset", "assets", "sources", "apy"],
+      "properties": {
+        "chain": { "type": "string" }, "vault": { "type": "string" }, "owner": { "type": "string" },
+        "checked": { "const": true }, "empty": { "const": false },
+        "shares": { "type": "object", "required": ["raw", "decimals", "amount"] },
+        "asset": { "type": "object", "required": ["address", "decimals"] },
+        "assets": { "type": "object", "required": ["raw", "amount"] },
+        "sources": { "type": "array", "items": { "type": "string" }, "minItems": 2 },
+        "apy": { "type": "object" },
+        "accrued": { "type": "object" }
+      },
+      "additionalProperties": false
+    }
+  ]
+}
