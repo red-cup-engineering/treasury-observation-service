@@ -21,43 +21,33 @@
   },
   "exports": {
     ".": {
-      "types": "./src/index.d.ts",
       "default": "./src/index.mjs"
     },
     "./chains": {
-      "types": "./src/chains.d.ts",
       "default": "./src/chains.mjs"
     },
     "./native": {
-      "types": "./src/native.d.ts",
       "default": "./src/native.mjs"
     },
     "./tokens": {
-      "types": "./src/tokens.d.ts",
       "default": "./src/tokens.mjs"
     },
     "./positions": {
-      "types": "./src/positions.d.ts",
       "default": "./src/positions.mjs"
     },
     "./rewards": {
-      "types": "./src/rewards.d.ts",
       "default": "./src/rewards.mjs"
     },
     "./portfolio": {
-      "types": "./src/portfolio.d.ts",
       "default": "./src/portfolio.mjs"
     },
     "./opportunities": {
-      "types": "./src/opportunities.d.ts",
       "default": "./src/opportunities.mjs"
     },
     "./hive-engine-opportunities": {
-      "types": "./src/hive-engine-opportunities.d.ts",
       "default": "./src/hive-engine-opportunities.mjs"
     },
     "./morpho": {
-      "types": "./src/morpho.d.ts",
       "default": "./src/morpho.mjs"
     },
     "./observe-morpho-vault-position": "./scripts/observe-morpho-vault-position.mjs",
@@ -65,11 +55,11 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
-    "@red-cup-engineering/ethereum-engineering-services-section": "workspace:*",
-    "@red-cup-engineering/json-schema-services-section": "workspace:*",
-    "@red-cup-engineering/normalize-earning-opportunity-service": "workspace:*",
-    "@red-cup-engineering/observe-hive-engine-liquidity-opportunity-service": "workspace:*",
-    "ethers": "6.17.0"
+    "ethers": "6.17.0",
+    "@red-cup-engineering/ethereum-engineering-services-section": "0.15.1",
+    "@red-cup-engineering/json-schema-services-section": "0.5.0",
+    "@red-cup-engineering/normalize-earning-opportunity-service": "0.1.0",
+    "@red-cup-engineering/observe-hive-engine-liquidity-opportunity-service": "0.1.0"
   },
   "engines": {
     "node": ">=24"
@@ -80,5 +70,6 @@
     "scripts",
     "schemas",
     "README.md"
-  ]
+  ],
+  "private": false
 }
