@@ -1,6 +1,6 @@
 {
   "name": "@red-cup-engineering/treasury-observation-service",
-  "version": "0.5.1",
+  "version": "0.5.3",
   "type": "module",
   "description": "Read-only observation of the Group's on-chain treasury: EVM balances and positions plus normalized, provenance-bearing cross-chain earning opportunities. Distinguishes a checked zero from an unchecked chain and unavailable APY from zero yield, always.",
   "keywords": [
@@ -56,10 +56,10 @@
   },
   "dependencies": {
     "ethers": "6.17.0",
-    "@red-cup-engineering/ethereum-engineering-services-section": "0.15.1",
     "@red-cup-engineering/json-schema-services-section": "0.5.0",
-    "@red-cup-engineering/normalize-earning-opportunity-service": "0.1.0",
-    "@red-cup-engineering/observe-hive-engine-liquidity-opportunity-service": "0.1.0"
+    "@red-cup-engineering/ethereum-engineering-services-section": "0.15.2",
+    "@red-cup-engineering/normalize-earning-opportunity-service": "0.1.1",
+    "@red-cup-engineering/observe-hive-engine-liquidity-opportunity-service": "0.1.2"
   },
   "engines": {
     "node": ">=24"
