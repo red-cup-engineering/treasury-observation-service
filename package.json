@@ -5,8 +5,7 @@
   "description": "Read-only observation of the Group's on-chain treasury: EVM balances and positions plus normalized, provenance-bearing cross-chain earning opportunities. Distinguishes a checked zero from an unchecked chain and unavailable APY from zero yield, always.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/red-cup-engineering/financial-engineering-services-section.git",
-    "directory": "services/treasury-observation-service"
+    "url": "git+https://github.com/red-cup-engineering/treasury-observation-service.git"
   },
   "keywords": [
     "561-group",
