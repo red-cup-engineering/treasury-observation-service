@@ -60,7 +60,7 @@
   },
   "dependencies": {
     "ethers": "6.17.0",
-    "@red-cup-engineering/json-schema-services-section": "0.5.0",
+    "@red-cup-engineering/json-schema-engineering-services-section": "0.5.0",
     "@red-cup-engineering/ethereum-engineering-services-section": "0.15.2",
     "@red-cup-engineering/normalize-earning-opportunity-service": "0.1.1",
     "@red-cup-engineering/observe-hive-engine-liquidity-opportunity-service": "0.1.2"
