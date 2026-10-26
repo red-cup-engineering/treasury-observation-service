@@ -4,7 +4,7 @@
  * selected RPC endpoints and reported `checked: true` only when both agree exactly.
  */
 import { Interface, getAddress } from "ethers";
-import { call, formatUnits, observationBlockTag } from "./chains.mjs";
+import { call, formatUnits, observationBlockTag, observationProvenance, verifyObservationBoundary } from "./chains.mjs";
 
 const vaultInterface = new Interface([
   "function balanceOf(address) view returns (uint256)",
@@ -23,10 +23,23 @@ const MORPHO_GRAPHQL_ENDPOINT = "https://api.morpho.org/graphql";
  */
 async function callOneEndpoint(chainDescriptorAtOneEndpoint, to, fn, args, options) {
   const data = vaultInterface.encodeFunctionData(fn, args);
-  const result = await call(chainDescriptorAtOneEndpoint, "eth_call", [{ to, data }, observationBlockTag(options)], options);
+  const sourceOptions = options.boundary === undefined ? options : {
+    ...options,
+    boundary: { ...options.boundary, provider: chainDescriptorAtOneEndpoint.rpc[0] },
+  };
+  const result = await call(chainDescriptorAtOneEndpoint, "eth_call", [{ to, data }, observationBlockTag(sourceOptions)], sourceOptions);
   if (!result.ok) return result;
+  if (options.boundary !== undefined) {
+    const verified = await verifyObservationBoundary(chainDescriptorAtOneEndpoint, sourceOptions.boundary, sourceOptions);
+    if (!verified.ok) return verified;
+  }
   try {
-    return { ok: true, value: vaultInterface.decodeFunctionResult(fn, result.value)[0], via: result.via };
+    return {
+      ok: true, value: vaultInterface.decodeFunctionResult(fn, result.value)[0], via: result.via,
+      ...(options.boundary === undefined ? {} : {
+        provenance: { ...options.boundary, method: "eth_call", blockTag: options.boundary.blockTag },
+      }),
+    };
   } catch (error) {
     return { ok: false, reason: `malformed ${fn} response from ${result.via}: ${error.message}`, attempts: [] };
   }
@@ -39,7 +52,10 @@ async function callOneEndpoint(chainDescriptorAtOneEndpoint, to, fn, args, optio
  * @returns {Promise<{ok: true, value: bigint, sources: readonly string[]}|{ok: false, reason: string, attempts: readonly import("./chains.d.ts").Attempt[]}>}
  */
 async function dualSourceRead(chainDescriptor, to, fn, args, options) {
-  const endpoints = [...new Set(chainDescriptor.rpc)];
+  if (options.boundary !== undefined && !chainDescriptor.rpc.includes(options.boundary.provider)) {
+    return { ok: false, reason: "observation boundary provider is not registered for this chain", attempts: [] };
+  }
+  const endpoints = [...new Map(chainDescriptor.rpc.map((url) => [new URL(url).href, url])).values()];
   if (endpoints.length < 2) {
     return { ok: false, reason: `${chainDescriptor.id} has only ${endpoints.length} registered RPC endpoint(s); two independent sources are required`, attempts: [] };
   }
@@ -62,7 +78,19 @@ async function dualSourceRead(chainDescriptor, to, fn, args, options) {
       attempts: [],
     };
   }
-  return { ok: true, value: resultA.value, sources: [urlA, urlB] };
+  return { ok: true, value: resultA.value, sources: [urlA, urlB], reads: [resultA, resultB] };
+}
+
+function positionProvenance(boundary, outcomes) {
+  if (boundary === undefined) return {};
+  const reads = outcomes.flatMap((outcome) => outcome.reads);
+  const provenance = observationProvenance(boundary, reads);
+  return {
+    provenance: {
+      ...provenance,
+      reads: provenance.reads.map((read, index) => ({ ...read, provider: reads[index].via })),
+    },
+  };
 }
 
 /**
@@ -96,6 +124,7 @@ export async function observeMorphoVaultPosition(chainDescriptor, vaultAddress, 
       chain: chainDescriptor.id, vault, owner, checked: true, empty: true,
       shares: { raw: "0", decimals: shareDecimals, amount: formatUnits(0n, shareDecimals) },
       sources: sharesRead.sources,
+      ...positionProvenance(options.boundary, [sharesRead, decimalsRead]),
     };
   }
 
@@ -125,6 +154,7 @@ export async function observeMorphoVaultPosition(chainDescriptor, vaultAddress, 
     asset: { address: assetAddress, decimals: assetDecimals },
     assets: { raw: assetsRaw.toString(), amount: formatUnits(assetsRaw, assetDecimals) },
     sources: sharesRead.sources,
+    ...positionProvenance(options.boundary, [sharesRead, decimalsRead, assetRead, assetDecimalsRead, assetsRead]),
   };
 }
 
@@ -142,7 +172,10 @@ export async function observeMorphoConvertToShares(chainDescriptor, vaultAddress
   const vault = getAddress(vaultAddress);
   const read = await dualSourceRead(chainDescriptor, vault, "convertToShares", [BigInt(assetsRaw)], options);
   if (!read.ok) return { chain: chainDescriptor.id, vault, checked: false, reason: read.reason, attempts: read.attempts };
-  return { chain: chainDescriptor.id, vault, checked: true, sharesRaw: read.value.toString(), sources: read.sources };
+  return {
+    chain: chainDescriptor.id, vault, checked: true, sharesRaw: read.value.toString(), sources: read.sources,
+    ...positionProvenance(options.boundary, [read]),
+  };
 }
 
 /**
@@ -213,3 +246,4 @@ export async function fetchMorphoVaultApy({ vault, chainId }, options = {}) {
     };
   }
 }
+

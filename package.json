@@ -20,10 +20,14 @@
     "defi"
   ],
   "scripts": {
+    "observe-portfolio": "node scripts/observe-portfolio.mjs",
     "check": "for f in src/*.mjs; do node --check \"$f\" || exit 1; done",
     "test": "node --test test/*.test.mjs"
   },
   "exports": {
+    "./observe-portfolio": "./scripts/observe-portfolio.mjs",
+    "./schemas/observe-portfolio.input": "./schemas/observe-portfolio.input.schema.json",
+    "./schemas/observe-portfolio.output": "./schemas/observe-portfolio.output.schema.json",
     ".": {
       "default": "./src/index.mjs"
     },
@@ -82,3 +86,4 @@
     "url": "https://github.com/561-group/.github/blob/main/TIPS.md"
   }
 }
+

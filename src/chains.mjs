@@ -198,20 +198,24 @@ function baseBoundary(boundary) {
     chainId: boundary.chainId,
     blockNumber: boundary.blockNumber,
     blockHash: boundary.blockHash,
+    ...(boundary.blockTimestampSeconds === undefined ? {} : {
+      blockTimestamp: boundary.blockTimestampSeconds,
+    }),
   };
 }
 
-function baseReadPool(options) {
+function baseReadPool(options, chainDescriptor) {
   if (options.publicEvmReadPool != null) return options.publicEvmReadPool;
+  const transportOptions = { ...options, timeoutMs: options.timeoutMs ?? 15000 };
   const createClient = options.fetchImpl == null ? undefined : ({ provider }) => ({
     async getChainId() {
-      const result = await requestAt(provider.url, "eth_chainId", [], options);
+      const result = await requestAt(provider.url, "eth_chainId", [], transportOptions);
       if (!result.ok) throw new Error(result.error);
       return Number(hexToBigInt(result.value));
     },
     async getBlock({ blockNumber } = {}) {
       const tag = blockNumber == null ? "latest" : `0x${blockNumber.toString(16)}`;
-      const result = await requestAt(provider.url, "eth_getBlockByNumber", [tag, false], options);
+      const result = await requestAt(provider.url, "eth_getBlockByNumber", [tag, false], transportOptions);
       if (!result.ok) throw new Error(result.error);
       return {
         ...result.value,
@@ -220,7 +224,7 @@ function baseReadPool(options) {
       };
     },
     async request({ method, params }) {
-      const result = await requestAt(provider.url, method, params, options);
+      const result = await requestAt(provider.url, method, params, transportOptions);
       if (!result.ok) throw new Error(result.error);
       return result.value;
     },
@@ -228,18 +232,39 @@ function baseReadPool(options) {
   });
   return options.publicEvmReadPool ?? createPublicEvmReadPool({
     chain: BASE_PUBLIC_EVM_CHAIN,
-    providers: BASE_PUBLIC_EVM_PROVIDERS,
+    providers: chainDescriptor.rpc.map((url, index) => ({
+      id: BASE_PUBLIC_EVM_PROVIDERS.find((provider) => new URL(provider.url).href === new URL(url).href)?.id
+        ?? `treasury-base-${index + 1}`,
+      url,
+    })),
     ...(createClient === undefined ? {} : { createClient }),
   });
+}
+
+async function requestBaseBoundary(chainDescriptor, options, request) {
+  const pool = baseReadPool(options, chainDescriptor);
+  const endpoints = new Set(chainDescriptor.rpc.map((url) => new URL(url).href));
+  const providerIds = Array.isArray(pool.providers)
+    ? pool.providers.filter((provider) => endpoints.has(new URL(provider.url).href)).map(({ id }) => id)
+    : undefined;
+  if (providerIds?.length === 0) throw new Error("Base read pool has no selected chain endpoint");
+  const result = await pool.requestAtBoundary({
+    ...request,
+    ...(providerIds === undefined ? {} : { providerIds }),
+  });
+  if (!endpoints.has(new URL(result.provider?.url).href)) {
+    throw new Error("Base read pool answered from an unselected chain endpoint");
+  }
+  return result;
 }
 
 function poolAttempts(error) {
   return error?.report?.failures?.map(({ endpoint, message }) => ({ url: endpoint, error: message })) ?? [];
 }
 
-async function fixedBaseCall(boundary, method, params, options) {
+async function fixedBaseCall(chainDescriptor, boundary, method, params, options) {
   try {
-    const result = await baseReadPool(options).requestAtBoundary({
+    const result = await requestBaseBoundary(chainDescriptor, options, {
       boundary: baseBoundary(boundary), method, params,
     });
     // The pool independently verifies every provider's chain and exact block hash before use.
@@ -308,7 +333,7 @@ export async function call(chainDescriptor, method, params, options = {}) {
     if (boundaryError !== null) return unreachable(`chains: ${boundaryError}`, []);
   }
   if (boundary !== undefined && chainDescriptor.chainId === BASE_PUBLIC_EVM_CHAIN.id) {
-    return fixedBaseCall(boundary, method, params, options);
+    return fixedBaseCall(chainDescriptor, boundary, method, params, options);
   }
   const endpoints = boundary === undefined ? chainDescriptor.rpc : [boundary.provider];
   for (const url of endpoints) {
@@ -393,7 +418,7 @@ export async function verifyObservationBoundary(chainDescriptor, boundary, optio
   if (invalid !== null) return unreachable(`chains: ${invalid}`, []);
   if (chainDescriptor.chainId === BASE_PUBLIC_EVM_CHAIN.id) {
     try {
-      await baseReadPool(options).requestAtBoundary({
+      await requestBaseBoundary(chainDescriptor, options, {
         boundary: baseBoundary(boundary), operation: async () => true,
       });
       return ok(boundary, boundary.provider);
@@ -519,3 +544,4 @@ export function formatUnits(raw, decimals) {
   const body = fraction === "" ? whole : `${whole}.${fraction}`;
   return negative && /[1-9]/u.test(body) ? `-${body}` : body;
 }
+
