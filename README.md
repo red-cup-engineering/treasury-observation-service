@@ -9,6 +9,47 @@
 
 Read-only observation of the Group's on-chain treasury: EVM balances and positions plus normalized, provenance-bearing cross-chain earning opportunities. Distinguishes a checked zero from an unchecked chain and unavailable APY from zero yield, always.
 
+## Operator bounds for public portfolio acquisition
+
+The existing `observePortfolioReport(input, injected)` and
+`observePortfolio(input, injected)` entry points accept an operator-owned
+`injected.acquisitionLimits` record. Select all four limits together:
+
+```js
+const report = await observePortfolioReport(request, {
+  acquisitionLimits: {
+    maxRequests: 256,
+    maxDurationMs: 30000,
+    maxResponseBytes: 1048576,
+    maxTokenCandidates: 32,
+  },
+});
+```
+
+One captured budget counts every RPC and indexer request across the complete
+observation. Its deadline includes response-body reads, and each body is bounded
+before parsing. The selected per-provider timeout still applies within this
+overall deadline, including the original Base pool's rate-scheduler waits. Every
+fetch remains at its selected provider URL. Completed bodies release their stream readers; exceeded bounds
+abort transport and cancel pending bodies. An exhausted budget prevents another
+Base read-pool operation from starting. Calls without operator limits retain the
+existing library behavior.
+
+The token verifier examines at most the selected number of discovered candidates.
+It retains those holdings, records the discovered and examined counts, and marks
+token and portfolio coverage incomplete when candidates remain. Explicit lending
+and vault positions use the same shared acquisition budget. If a limit prevents
+final block reconciliation, acquired component data remains available under an
+unchecked chain and wallet result. The existing coverage fields describe what
+could be completed.
+
+Public JSON input cannot supply `acquisitionLimits` or a transport. A merchant
+binds the configuration from its own compute declaration and uses the original
+input/output schemas for API discovery and forms. The first public offer selects
+one wallet, one registered chain and up to eight explicit positions within the
+example limits above. Operator receiving should record actual latency and request
+cost against the chosen list price.
+
 ## Wallet portfolios for agents and reports
 
 `observePortfolio` combines native balances, verified token holdings, Beefy

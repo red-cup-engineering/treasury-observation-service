@@ -163,6 +163,7 @@ export function observationProvenance(boundary, outcomes = []) {
 async function requestAt(url, method, params, options) {
   const { fetchImpl, timeoutMs } = options;
   try {
+    options.acquisitionBudget?.assertAvailable();
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     let payload;
@@ -238,10 +239,13 @@ function baseReadPool(options, chainDescriptor) {
       url,
     })),
     ...(createClient === undefined ? {} : { createClient }),
+    ...(options.acquisitionBudget === undefined ? {} : { sleep: options.acquisitionBudget.sleep }),
   });
 }
 
 async function requestBaseBoundary(chainDescriptor, options, request) {
+  // A spent portfolio budget must not start another rate-scheduled pool operation.
+  options.acquisitionBudget?.assertAvailable();
   const pool = baseReadPool(options, chainDescriptor);
   const endpoints = new Set(chainDescriptor.rpc.map((url) => new URL(url).href));
   const providerIds = Array.isArray(pool.providers)
@@ -337,7 +341,7 @@ export async function call(chainDescriptor, method, params, options = {}) {
   }
   const endpoints = boundary === undefined ? chainDescriptor.rpc : [boundary.provider];
   for (const url of endpoints) {
-    const result = await requestAt(url, method, params, { fetchImpl, timeoutMs });
+    const result = await requestAt(url, method, params, { ...options, fetchImpl, timeoutMs });
     if (!result.ok) {
       attempts.push({ url, error: result.error });
       continue;
@@ -362,7 +366,7 @@ export async function acquireObservationBoundary(chainDescriptor, options = {}) 
   }
   const attempts = [];
   for (const provider of chainDescriptor.rpc) {
-    const chainIdResult = await requestAt(provider, "eth_chainId", [], { fetchImpl, timeoutMs });
+    const chainIdResult = await requestAt(provider, "eth_chainId", [], { ...options, fetchImpl, timeoutMs });
     if (!chainIdResult.ok) {
       attempts.push({ url: provider, error: `eth_chainId: ${chainIdResult.error}` });
       continue;
@@ -378,7 +382,7 @@ export async function acquireObservationBoundary(chainDescriptor, options = {}) 
       attempts.push({ url: provider, error: `wrong chain id ${observedChainId}, expected ${chainDescriptor.chainId}` });
       continue;
     }
-    const blockResult = await requestAt(provider, "eth_getBlockByNumber", [finality, false], { fetchImpl, timeoutMs });
+    const blockResult = await requestAt(provider, "eth_getBlockByNumber", [finality, false], { ...options, fetchImpl, timeoutMs });
     const block = blockResult.ok ? blockResult.value : null;
     if (!blockResult.ok || block === null || typeof block !== "object"
       || typeof block.number !== "string" || typeof block.hash !== "string") {
@@ -426,7 +430,7 @@ export async function verifyObservationBoundary(chainDescriptor, boundary, optio
       return unreachable(`cannot reconcile fixed Base boundary: ${String(error?.message ?? error)}`, poolAttempts(error));
     }
   }
-  const chainIdResult = await requestAt(boundary.provider, "eth_chainId", [], { fetchImpl, timeoutMs });
+  const chainIdResult = await requestAt(boundary.provider, "eth_chainId", [], { ...options, fetchImpl, timeoutMs });
   if (!chainIdResult.ok) {
     return unreachable(`cannot reconcile boundary chain identity: ${chainIdResult.error}`, [
       { url: boundary.provider, error: chainIdResult.error },
@@ -442,7 +446,7 @@ export async function verifyObservationBoundary(chainDescriptor, boundary, optio
     return unreachable(`boundary provider changed chain id from ${boundary.chainId} to ${observedChainId}`, []);
   }
   const blockResult = await requestAt(
-    boundary.provider, "eth_getBlockByNumber", [boundary.blockTag, false], { fetchImpl, timeoutMs },
+    boundary.provider, "eth_getBlockByNumber", [boundary.blockTag, false], { ...options, fetchImpl, timeoutMs },
   );
   if (!blockResult.ok) {
     return unreachable(`cannot reconcile boundary ${boundary.blockTag}: ${blockResult.error}`, [
