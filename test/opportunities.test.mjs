@@ -6,23 +6,25 @@ import { observeHiveEngineLiquidityOpportunity } from "@red-cup-engineering/obse
 const OBSERVED_AT = "2026-09-02T02:32:05.207Z";
 const BLOCK_ID = "a".repeat(64);
 
-function response(result) {
-  return { ok: true, status: 200, json: async () => ({ jsonrpc: "2.0", id: 1, result }) };
+function response(result, id) {
+  return new Response(JSON.stringify({ jsonrpc: "2.0", id, result }), {
+    status: 200, headers: { "content-type": "application/json" },
+  });
 }
 
 function fetchFixture(calls) {
   return async (endpoint, options) => {
     const request = JSON.parse(options.body);
     calls.push({ endpoint, request });
-    if (request.method === "getLatestBlockInfo") return response({ blockNumber: 987, hash: BLOCK_ID });
+    if (request.method === "getLatestBlockInfo") return response({ blockNumber: 987, hash: BLOCK_ID }, request.id);
     const { contract, table, query } = request.params;
     if (contract === "tokens" && table === "balances") {
-      return response([{ account: query.account, symbol: query.symbol, balance: query.symbol === "ZING" ? "35834.510" : "69.00738622" }]);
+      return response([{ account: query.account, symbol: query.symbol, balance: query.symbol === "ZING" ? "35834.510" : "69.00738622" }], request.id);
     }
     if (contract === "marketpools" && table === "pools") {
-      return response([{ tokenPair: "ZING:SWAP.HIVE", baseQuantity: "44891805.37004403", quoteQuantity: "29661.25516993", totalShares: "1105463.01348207779783664309" }]);
+      return response([{ tokenPair: "ZING:SWAP.HIVE", baseQuantity: "44891805.37004403", quoteQuantity: "29661.25516993", totalShares: "1105463.01348207779783664309" }], request.id);
     }
-    if (contract === "marketpools" && table === "params") return response([{ tradeFeeMul: "0.9975" }]);
+    if (contract === "marketpools" && table === "params") return response([{ tradeFeeMul: "0.9975" }], request.id);
     throw new Error("unexpected fixture request");
   };
 }
@@ -65,7 +67,7 @@ test("observeHiveEngineLiquidityOpportunity(): refuses missing holdings before p
     fetchImpl: async (endpoint, options) => {
       const request = JSON.parse(options.body);
       if (request.params?.contract === "tokens" && request.params.query.symbol === "ZING") {
-        return response([{ account: "michael561", symbol: "ZING", balance: "0" }]);
+        return response([{ account: "michael561", symbol: "ZING", balance: "0" }], request.id);
       }
       return fixture(endpoint, options);
     },
@@ -93,7 +95,7 @@ test("observeHiveEngineLiquidityOpportunity(): refuses table values when the sid
       const request = JSON.parse(options.body);
       if (request.method === "getLatestBlockInfo") {
         boundaryReads += 1;
-        return response({ blockNumber: 987 + boundaryReads - 1, hash: String(boundaryReads).repeat(64) });
+        return response({ blockNumber: 987 + boundaryReads - 1, hash: String(boundaryReads).repeat(64) }, request.id);
       }
       return fixture(endpoint, options);
     },
