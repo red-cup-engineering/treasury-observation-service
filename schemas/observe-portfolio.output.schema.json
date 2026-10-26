@@ -1,0 +1,506 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "treasury-observation-service/observe-portfolio-output",
+  "title": "Wallet portfolio observation",
+  "type": "object",
+  "required": [
+    "observedAt",
+    "roster",
+    "chains",
+    "coverage"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "observedAt": {
+      "type": "string"
+    },
+    "roster": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "subject",
+          "address"
+        ],
+        "properties": {
+          "subject": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$"
+          }
+        }
+      }
+    },
+    "chains": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/chain"
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "required": [
+        "complete",
+        "incompleteChains"
+      ],
+      "properties": {
+        "complete": {
+          "type": "boolean"
+        },
+        "incompleteChains": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "boundary": {
+      "type": "object",
+      "required": [
+        "chain",
+        "chainId",
+        "caip2",
+        "blockNumber",
+        "blockTag",
+        "blockHash",
+        "requestedFinality",
+        "finality",
+        "observedAt",
+        "provider"
+      ],
+      "properties": {
+        "chain": {
+          "type": "string"
+        },
+        "chainId": {
+          "type": "integer"
+        },
+        "caip2": {
+          "type": "string"
+        },
+        "blockNumber": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
+        },
+        "blockTag": {
+          "type": "string"
+        },
+        "blockHash": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{64}$"
+        },
+        "blockTimestampSeconds": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
+        },
+        "requestedFinality": {
+          "enum": [
+            "latest",
+            "safe",
+            "finalized"
+          ]
+        },
+        "finality": {
+          "enum": [
+            "unfinalized",
+            "safe",
+            "finalized"
+          ]
+        },
+        "observedAt": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "reads": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "trackedPosition": {
+      "type": "object",
+      "required": [
+        "kind",
+        "contract",
+        "checked"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "compound-fork",
+            "erc4626"
+          ]
+        },
+        "contract": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{40}$"
+        },
+        "checked": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/boundary"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "checked": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "reason"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "checked": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "provenance"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "compound-fork"
+              },
+              "checked": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "market",
+              "address",
+              "suppliedUnderlyingRaw",
+              "borrowedUnderlyingRaw",
+              "mTokenBalanceRaw",
+              "supplyRatePerTimestampMantissa",
+              "borrowRatePerTimestampMantissa",
+              "empty"
+            ],
+            "properties": {
+              "market": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              },
+              "address": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              },
+              "suppliedUnderlyingRaw": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]*)$"
+              },
+              "borrowedUnderlyingRaw": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]*)$"
+              },
+              "mTokenBalanceRaw": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]*)$"
+              },
+              "supplyRatePerTimestampMantissa": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]*)$"
+              },
+              "borrowRatePerTimestampMantissa": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]*)$"
+              },
+              "empty": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "erc4626"
+              },
+              "checked": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "vault",
+              "owner",
+              "shares",
+              "sources",
+              "empty"
+            ],
+            "properties": {
+              "vault": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              },
+              "owner": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              },
+              "shares": {
+                "type": "object",
+                "required": [
+                  "raw",
+                  "decimals",
+                  "amount"
+                ],
+                "properties": {
+                  "raw": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]*)$"
+                  },
+                  "decimals": {
+                    "type": "integer"
+                  },
+                  "amount": {
+                    "type": "string"
+                  }
+                }
+              },
+              "sources": {
+                "type": "array",
+                "minItems": 2,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string"
+                }
+              },
+              "empty": {
+                "type": "boolean"
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "empty": {
+                      "const": false
+                    }
+                  }
+                },
+                "then": {
+                  "required": [
+                    "asset",
+                    "assets"
+                  ],
+                  "properties": {
+                    "asset": {
+                      "type": "object",
+                      "required": [
+                        "address",
+                        "decimals"
+                      ],
+                      "properties": {
+                        "address": {
+                          "type": "string",
+                          "pattern": "^0x[0-9a-fA-F]{40}$"
+                        },
+                        "decimals": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "assets": {
+                      "type": "object",
+                      "required": [
+                        "raw",
+                        "amount"
+                      ],
+                      "properties": {
+                        "raw": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]*)$"
+                        },
+                        "amount": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "wallet": {
+      "type": "object",
+      "required": [
+        "subject",
+        "address",
+        "checked"
+      ],
+      "properties": {
+        "subject": {
+          "type": "string"
+        },
+        "address": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{40}$"
+        },
+        "checked": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "trackedPositions": {
+          "type": "object",
+          "required": [
+            "checked",
+            "positions"
+          ],
+          "properties": {
+            "checked": {
+              "type": "boolean"
+            },
+            "positions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/trackedPosition"
+              }
+            },
+            "reason": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "checked": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "native",
+              "verifiedTokens",
+              "moonwellRewards",
+              "beefyPositions"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "checked": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "reason"
+            ]
+          }
+        }
+      ]
+    },
+    "chain": {
+      "type": "object",
+      "required": [
+        "chain",
+        "caip2",
+        "checked",
+        "provenance",
+        "wallets",
+        "coverage"
+      ],
+      "properties": {
+        "chain": {
+          "type": "string"
+        },
+        "caip2": {
+          "type": "string"
+        },
+        "checked": {
+          "type": "boolean"
+        },
+        "provenance": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/boundary"
+            }
+          ]
+        },
+        "wallets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/wallet"
+          }
+        },
+        "coverage": {
+          "type": "object",
+          "required": [
+            "walletsAttempted",
+            "walletsObserved",
+            "complete",
+            "unchecked"
+          ],
+          "properties": {
+            "walletsAttempted": {
+              "type": "integer"
+            },
+            "walletsObserved": {
+              "type": "integer"
+            },
+            "complete": {
+              "type": "boolean"
+            },
+            "unchecked": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "subject",
+                  "component",
+                  "reason"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
