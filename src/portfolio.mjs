@@ -11,6 +11,7 @@ import { observeCompoundForkMarket, observeVaultPosition } from "./positions.mjs
 import { observeMorphoVaultPosition } from "./morpho.mjs";
 import { observeMoonwellOutstandingRewards } from "./rewards.mjs";
 import { verifiedTokenHoldings } from "./tokens.mjs";
+import { createObservationBudget } from "./observation-budget.mjs";
 
 const BEEFY_SYMBOL_PATTERN = /^r?(?:moo|Moo)/u;
 export const PORTFOLIO_LIMITS = Object.freeze({ wallets: 100, chains: 16, positionsPerChain: 100, concurrency: 16 });
@@ -197,6 +198,7 @@ async function observeTrackedPositions(chainDescriptor, wallet, selections, opti
 async function defaultObserveChain(chainDescriptor, roster, config, dependencies) {
   const boundaryResult = await dependencies.acquireBoundary(chainDescriptor, {
     fetchImpl: dependencies.fetchImpl,
+    acquisitionBudget: config.acquisitionBudget,
     timeoutMs: config.timeoutMs,
     finality: config.finality,
     now: () => config.observedDate,
@@ -227,6 +229,7 @@ async function defaultObserveChain(chainDescriptor, roster, config, dependencies
   const boundary = boundaryResult.value;
   const options = {
     fetchImpl: dependencies.fetchImpl,
+    acquisitionBudget: config.acquisitionBudget,
     timeoutMs: config.timeoutMs,
     boundary,
   };
@@ -281,6 +284,7 @@ async function defaultObserveChain(chainDescriptor, roster, config, dependencies
 
   const verified = await dependencies.verifyBoundary(chainDescriptor, boundary, {
     fetchImpl: dependencies.fetchImpl,
+    acquisitionBudget: config.acquisitionBudget,
     timeoutMs: config.timeoutMs,
   });
   if (!verified.ok) {
@@ -291,7 +295,9 @@ async function defaultObserveChain(chainDescriptor, roster, config, dependencies
       provenance: boundary,
       reason: verified.reason,
       attempts: verified.attempts,
-      wallets: roster.map((wallet) => ({
+      // Retain acquired component data when a configured acquisition limit
+      // prevents final reconciliation. The outer result remains unchecked.
+      wallets: (config.acquisitionBudget?.limited ? wallets : roster).map((wallet) => ({
         ...wallet,
         checked: false,
         reason: `observation boundary could not be reconciled: ${verified.reason}`,
@@ -369,19 +375,28 @@ export async function observePortfolio(input, injected = {}) {
     throw new RangeError(`portfolio: concurrency must be an integer from 1 through ${PORTFOLIO_LIMITS.concurrency}`);
   }
 
-  // Complete each chain's bounded wallet queue before acquiring the next chain boundary.
-  const observations = await callMany(chains.map(
-    (descriptor) => () => dependencies.observeChain(descriptor, roster, config, dependencies),
-  ), 1);
-  const incompleteChains = observations.filter(({ coverage }) => !coverage.complete).map(({ chain }) => chain);
-  return {
-    observedAt: observedDate.toISOString(),
-    roster,
-    chains: observations,
-    coverage: {
-      complete: incompleteChains.length === 0,
-      incompleteChains,
-    },
-  };
+  // These limits come from the operator's injection, never the public request.
+  // Capture one budget before any acquisition and share it across all chains.
+  const acquisitionBudget = createObservationBudget(injected.acquisitionLimits, dependencies.fetchImpl);
+  if (acquisitionBudget !== undefined) {
+    config.acquisitionBudget = acquisitionBudget;
+    dependencies.fetchImpl = acquisitionBudget.fetch;
+  }
+  try {
+    // Complete each chain's wallet queue before acquiring the next chain boundary.
+    const observations = await callMany(chains.map(
+      (descriptor) => () => dependencies.observeChain(descriptor, roster, config, dependencies),
+    ), 1);
+    const incompleteChains = observations.filter(({ coverage }) => !coverage.complete).map(({ chain }) => chain);
+    return {
+      observedAt: observedDate.toISOString(),
+      roster,
+      chains: observations,
+      coverage: {
+        complete: incompleteChains.length === 0,
+        incompleteChains,
+      },
+    };
+  } finally { acquisitionBudget?.close(); }
 }
 

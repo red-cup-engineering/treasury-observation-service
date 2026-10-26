@@ -24,13 +24,13 @@ const abi = new Interface([
 
 export function portfolioRpc({ chain = CHAINS.base, indexerUnavailable = true, secondSourceHash = BLOCK_HASH } = {}) {
   const calls = [];
-  const result = (value) => ({ ok: true, status: 200, json: async () => ({ jsonrpc: "2.0", id: 1, result: value }) });
+  const result = (value) => Response.json({ jsonrpc: "2.0", id: 1, result: value });
   const fetchImpl = async (url, init = {}) => {
     if (!init.body) {
       calls.push({ url, method: "GET" });
       return indexerUnavailable
-        ? { ok: false, status: 503, json: async () => ({}) }
-        : { ok: true, status: 200, json: async () => [] };
+        ? Response.json({}, { status: 503 })
+        : Response.json([]);
     }
     const request = JSON.parse(init.body);
     calls.push({ url, ...request });

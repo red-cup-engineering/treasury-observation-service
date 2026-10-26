@@ -174,10 +174,20 @@ export async function discoverTokenHoldings(chainDescriptor, walletAddress, opti
  * @returns {Promise<import("./tokens.d.ts").VerifiedTokenHoldings>}
  */
 export async function verifiedTokenHoldings(chainDescriptor, walletAddress, options = {}) {
-  const discovery = options.discovery ?? await discoverTokenHoldings(chainDescriptor, walletAddress, options);
+  const maximum = options.acquisitionBudget?.limits.maxTokenCandidates ?? 2048;
+  let discovery = options.discovery ?? await discoverTokenHoldings(chainDescriptor, walletAddress, options);
   if (!discovery.checked && !discovery.discovered?.length) return { ...discovery, holdings: [] };
-  if (!Array.isArray(discovery.discovered) || discovery.discovered.length > 2048) throw new TypeError("bounded-token-candidates-required");
+  if (!Array.isArray(discovery.discovered)
+    || options.acquisitionBudget === undefined && discovery.discovered.length > 2048) {
+    throw new TypeError("bounded-token-candidates-required");
+  }
   if (normalizedAddress("walletAddress", discovery.address) !== normalizedAddress("walletAddress", walletAddress) || discovery.chain !== chainDescriptor.id) throw new TypeError("token-candidate-wallet-chain-mismatch");
+  if (discovery.discovered.length > maximum) {
+    const discoveredCount = discovery.discovered.length;
+    discovery = { ...discovery, checked: false, discovered: discovery.discovered.slice(0, maximum),
+      reason: `${discovery.reason ? `${discovery.reason}; ` : ""}token candidate limit: examining ${maximum} of ${discoveredCount} discovered tokens`,
+      discoveredCount, examinedCandidates: maximum };
+  }
   const holdings = [];
   // Multicall retains one boundary while avoiding hundreds of public round trips.
   // Chains/providers that cannot return an aggregate retain bounded direct reads.
@@ -280,3 +290,4 @@ export async function balancesOfToken(chainDescriptor, tokenAddress, walletAddre
     catch (error) { return { address, checked: false, reason: `malformed balanceOf: ${error.message}` }; }
   });
 }
+
