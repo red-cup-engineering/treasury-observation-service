@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Interface } from "ethers";
-import { call, CHAINS, observeCoherentSnapshot } from "../src/chains.mjs";
+import { acquireObservationBoundary, call, CHAINS, observeCoherentSnapshot } from "../src/chains.mjs";
 import { observeAddress } from "../src/native.mjs";
 import { observeVaultPosition } from "../src/positions.mjs";
 import { observeMoonwellOutstandingRewards } from "../src/rewards.mjs";
@@ -40,7 +40,7 @@ function coherentRpc({ reorgOnVerification = false, failTokenBalance = false } =
     if (body.method === "eth_getBlockByNumber") {
       if (body.params[0] === BLOCK_TAG) exactHeaderReads += 1;
       const hash = reorgOnVerification && body.params[0] === BLOCK_TAG && exactHeaderReads > 0 ? REORG_HASH : BLOCK_HASH;
-      return rpcResult({ number: BLOCK_TAG, hash });
+      return rpcResult({ number: BLOCK_TAG, hash, timestamp: "0x64" });
     }
     if (body.method === "eth_getBalance") return rpcResult("0xde0b6b3a7640000");
     if (body.method === "eth_getTransactionCount") return rpcResult("0x7");
@@ -85,6 +85,7 @@ test("observeCoherentSnapshot(): every native, token, position, and reward read 
     chain: "base", chainId: 8453, caip2: "eip155:8453",
     requestedFinality: "finalized", finality: "finalized",
     blockNumber: "100", blockTag: BLOCK_TAG, blockHash: BLOCK_HASH,
+    blockTimestampSeconds: "100",
     observedAt: "2026-09-01T12:00:00.000Z", provider: CHAINS.base.rpc[0],
   });
   assert.equal(snapshot.observations.length, 4);
@@ -167,4 +168,63 @@ test("current quantities retain unfinalized classification and block time while 
  assert.equal(snapshot.observations[0].provenance.blockTimestampSeconds,'100');
  assert.ok(log.some(row=>row.method==='eth_getBlockByNumber'&&row.params[0]==='latest'));
  assert.ok(log.filter(row=>row.method==='eth_call').every(row=>row.params.at(-1)===BLOCK_TAG));
+});
+
+test("a current boundary cannot be relabeled finalized before a value-bearing read", async () => {
+  const {fetchImpl,log}=coherentRpc();
+  const acquired=await acquireObservationBoundary(CHAINS.base,{fetchImpl,finality:'latest',now:fixedNow});
+  assert.equal(acquired.ok,true);
+  const before=log.length;
+  const refused=await call(CHAINS.base,'eth_getBalance',[WALLET,BLOCK_TAG],{
+    fetchImpl,boundary:{...acquired.value,finality:'finalized'},
+  });
+  assert.equal(refused.ok,false);
+  assert.match(refused.reason,/classification/);
+  assert.equal(Object.hasOwn(refused,'value'),false);
+  assert.equal(log.length,before);
+});
+
+test("a leg with a different block timestamp cannot pass as the same observation", async () => {
+  const {fetchImpl}=coherentRpc();
+  const result=await observeCoherentSnapshot(CHAINS.base,[async options=>{
+    const observed=await observeAddress(CHAINS.base,WALLET,options);
+    return {...observed,provenance:{...observed.provenance,blockTimestampSeconds:'101'}};
+  }],{fetchImpl,now:fixedNow});
+  assert.equal(result.checked,false);
+  assert.match(result.reason,/mismatched boundary provenance/);
+  assert.equal(Object.hasOwn(result,'observations'),false);
+});
+
+test("a freshly acquired boundary requires an actual block timestamp",async()=>{
+ const {fetchImpl:source}=coherentRpc();
+ const acquired=await acquireObservationBoundary(CHAINS.base,{
+  finality:'latest',now:fixedNow,fetchImpl:async(url,init)=>{
+   const response=await source(url,init),request=JSON.parse(init.body);
+   if(response.ok&&request.method==='eth_getBlockByNumber'){
+    const payload=await response.json();delete payload.result.timestamp;
+    return {...response,json:async()=>payload};
+   }
+   return response;
+  },
+ });
+ assert.equal(acquired.ok,false);assert.equal(Object.hasOwn(acquired,'value'),false);
+ assert.ok(acquired.attempts.some(row=>/malformed latest block/.test(row.error)));
+});
+
+test("non-Base current state keeps the same exact block and unfinalized meaning",async()=>{
+ const calls=[];
+ const fetchImpl=async(url,init)=>{
+  const request=JSON.parse(init.body);calls.push(request);
+  if(request.method==='eth_chainId')return rpcResult('0x1');
+  if(request.method==='eth_getBlockByNumber')return rpcResult({number:BLOCK_TAG,hash:BLOCK_HASH,timestamp:'0x64'});
+  if(request.method==='eth_getBalance')return rpcResult('0x1');
+  if(request.method==='eth_getTransactionCount')return rpcResult('0x0');
+  throw new Error('unexpected non-Base read');
+ };
+ const result=await observeCoherentSnapshot(CHAINS.ethereum,[options=>observeAddress(CHAINS.ethereum,WALLET,options)],{fetchImpl,finality:'latest',now:fixedNow});
+ assert.equal(result.checked,true);
+ assert.equal(result.boundary.finality,'unfinalized');
+ assert.equal(result.observations[0].raw,'1');
+ assert.equal(result.observations[0].provenance.blockTimestampSeconds,'100');
+ assert.ok(calls.filter(row=>['eth_getBalance','eth_getTransactionCount'].includes(row.method)).every(row=>row.params.at(-1)===BLOCK_TAG));
 });
