@@ -26,7 +26,7 @@ function repoRoot() {
 
 function loadRoster() {
   const path = process.env.EVM_WALLET_FLEET_PATH
-    ?? join(repoRoot(), "lib/emsenn/services/561-group/services/public-services-section/services/public-computer-services-section/services/public-web-services-section/services/public-web3-services-section/services/agrodao/content/observations/public-accounts/evm-wallet-fleet.json");
+    ?? join(repoRoot(), "lib/emsenn/services/561-group/services/public-services-section/services/public-computer-services-section/services/public-computer-systems-services-section/services/public-web-services-section/services/public-web3-services-section/services/agrodao/content/observations/public-accounts/evm-wallet-fleet.json");
   const fleet = JSON.parse(readFileSync(path, "utf8"));
   if (!Array.isArray(fleet.wallets)) throw new TypeError(`wallet fleet at ${path} has no wallets array`);
   return fleet.wallets.map(({ subject, address }) => ({ subject, address }));
